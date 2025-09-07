@@ -28,6 +28,10 @@ To read configs, you need the `yq` utility. Please install it
 After cloning the repository, you can create symlinks like this:
 
 ```bash
+cd /home/user/path/to/repo
+chmod +x backup-monitor.sh
+chmod +x backup.sh
+
 cd /usr/local/bin/
 sudo ln -s /home/user/path/to/repo/backup.sh backup
 sudo ln -s /home/user/path/to/repo/backup-monitor.sh backup-monitor
@@ -47,6 +51,7 @@ Adding a backup script
 backup add-scenario /path/to/scenario
 ```
 For an example of the script design, see the file `config.yaml`
+
 That's all!
 
 If you want to delete the scenario:
