@@ -1,0 +1,63 @@
+# The most common backup settings
+general:
+  # The storage location for all backups
+  backup_storage: "~/.backups"
+  # At the moment, it adds the md5 amount to the file name.
+  add_hashsum: true
+
+# The name of the folder with backups inside backup storage
+name: "documents"
+
+compression:
+  # Supported methods:
+  #   tar - only for packaging
+  #   tar.gz - tar tar.gz - tar with gzip compressor
+  #   tar.bz - tar with bzip2 compressor
+  #   zip
+  #   zstd (in feauture)
+  # Tip: Use tar-like archives to save file access rights. It is also better
+  # to choose a low compression ratio or no compression at all for already
+  # compressed files (such as videos in h264/h265, music in mp3/flac/etc
+  # formats)
+  method: "tar"
+  # Supported values:
+  # - none, minimum, medium, maximum
+  level: "none"
+
+# Rules for the frequency of creating backups
+schedule:
+  # Create backups automatically according to a schedule (true/false)
+  enabled: true 
+  # Supported time formats:
+  #   s|sec|second|seconds
+  #   min|minute|minutes
+  #   h|hour|hours
+  #   d|day|days
+  #   w|week|weeks
+  #   mo|months
+  # Note: All values must be written without spaces (for example, '1h', but
+  # not '1 h'). All values add up. For example, the entry '1week 1week' is
+  # equivalent to `2week'
+  interval: "10sec"
+
+retention:
+  # How many backups should I keep? The oldest backup is deleted when the
+  # threshold is exceeded.
+  keep_last: 5
+
+files:
+  # Masks are not supported
+  include:
+    - "/path/to/include"
+  include_from:
+    - "path/to/file/with/filepaths"
+  # Masks are supported
+  exclude:
+    - "/exclude/file"
+    - "*.txt"
+  # In future
+  # exclude_from:
+  #   - "*/.gitignore"
+
+# In future
+# hooks:
