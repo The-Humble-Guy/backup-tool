@@ -20,7 +20,7 @@ Features:
 ## Dependencies
 
 Basic utilities are needed for the tool to work: `cp`, `mv`, `tar`, `gzip`,
-`bzip2`, `du`, `grep`, `cat`.
+`bzip2`, `zip`, `du`, `grep`, `cat`, `find`.
 
 To read configs, you need the `yq` utility. Please install it
 **additionally**.
@@ -45,7 +45,7 @@ Initializing the tool
 backup init
 ```
 
-Adding a backup script
+Adding a backup scenario
 
 ```bash
 backup add-scenario /path/to/scenario
@@ -66,3 +66,7 @@ Or in interactive mode:
 backup delete-scenario
 ```
 
+List of backups:
+```bash
+backup ls
+```

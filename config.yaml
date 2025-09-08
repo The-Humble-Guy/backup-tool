@@ -2,7 +2,7 @@
 general:
   # The storage location for all backups
   backup_storage: "~/.backups"
-  # At the moment, it adds the md5 amount to the file name.
+  # At the moment, it adds the md5 sum to the file name.
   add_hashsum: true
 
 # The name of the folder with backups inside backup storage
@@ -11,10 +11,10 @@ name: "documents"
 compression:
   # Supported methods:
   #   tar - only for packaging
-  #   tar.gz - tar tar.gz - tar with gzip compressor
+  #   tar.gz - tar with gzip compressor
   #   tar.bz - tar with bzip2 compressor
   #   zip
-  #   zstd (in feauture)
+  #   zstd (in future)
   # Tip: Use tar-like archives to save file access rights. It is also better
   # to choose a low compression ratio or no compression at all for already
   # compressed files (such as videos in h264/h265, music in mp3/flac/etc
@@ -36,12 +36,12 @@ schedule:
   #   w|week|weeks
   #   mo|months
   # Note: All values must be written without spaces (for example, '1h', but
-  # not '1 h'). All values add up. For example, the entry '1week 1week' is
-  # equivalent to `2week'
+  # not '1 h'). All values add up. So, the entry '1week 1week' is equivalent
+  # to `2week'
   interval: "10sec"
 
 retention:
-  # How many backups should I keep? The oldest backup is deleted when the
+  # How many backups should you keep? The oldest backup is deleted when the
   # threshold is exceeded.
   keep_last: 5
 
