@@ -247,9 +247,11 @@ find_with_patterns() {
   find_args+=("-print0")
 
   arr_ref=()
-  while IFS= read -r -d '' file; do
-      arr_ref+=("$file")
-  done < <(find "${find_args[@]}" 2>/dev/null)
+  if [[ $inverse == true ]]; then
+    while IFS= read -r -d '' file; do
+        arr_ref+=("$file")
+    done < <(find "${find_args[@]}" 2>/dev/null)
+  fi
 }
 
 # $1 - path to temp directory
