@@ -799,6 +799,41 @@ cmd_delete_scenario() {
   return 0
 }
 
+green_check() {
+  local green=$(tput setaf 2)
+  local reset=$(tput sgr0)
+  echo "${green}✓${reset}"
+}
+
+red_check() {
+  local red=$(tput setaf 1)
+  local reset=$(tput sgr0)
+  echo "${red}✗${reset}"
+}
+
+cmd_checkhealth() {
+  declare -a tools
+  tools=("bzip2" "cat" "cp" "crontab" "du" "find" "grep" "gzip" "head" "mv" "parallel" "pigz" "tail" "tar" "yq" "zip")
+  local max_length=0
+  local bold=$(tput bold)
+
+  for element in "${tools[@]}"; do
+    length=${#element}
+    if ((length > max_length)); then
+      max_length=$length
+    fi
+  done
+
+  printf "Checking the availability of utilities:\n"
+
+  for tool in "${tools[@]}"; do
+    printf "%-$((max_length + 10))s" "${bold}${tool}"
+    check_command "$tool" && green_check || red_check
+  done
+
+  return 0
+}
+
 cmd_list() {
   is_var_set "MONITOR_SCENARIOS" || die "Monitor scenarios file not set"
 
@@ -825,6 +860,7 @@ case "$COMMAND" in
   delete-scenario) shift; cmd_delete_scenario "$@" ;;
   ls|list|--list)  shift; cmd_list "$@" ;;
   create)          shift; cmd_create "$@" ;;
+  checkhealth)     shift; cmd_checkhealth "$@" ;;
   version)         shift; cmd_version "$@" ;;
 esac
 
