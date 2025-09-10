@@ -877,7 +877,7 @@ red_check() {
 
 cmd_checkhealth() {
   declare -a tools
-  tools=("bzip2" "cat" "cp" "crontab" "du" "find" "grep" "gzip" "head" "mv" "parallel" "pigz" "tail" "tar" "yq" "zip")
+  tools=("bzip2" "cat" "cp" "crontab" "du" "find" "grep" "gzip" "head" "mv" "parallel" "pbzip2" "pigz" "tail" "tar" "yq" "zip")
   local max_length=0
   local bold=$(tput bold)
 
