@@ -17,6 +17,7 @@ UNIQUE_COMMENT="BACKUP_TOOL"
 CONFIG_FILE=
 TIMESTAMP_FILE=
 BACKUP_HISTORY_FILE=
+IS_PARALLEL=false
 
 readonly INCLUDE_FILES=$(mktemp)
 readonly EXCLUDE_FILES=$(mktemp)
@@ -128,9 +129,23 @@ copy_command() {
   local dst="$2"
 
   is_var_set "EXCLUDE_FILES" || die "EXCLUDE_FILES is not set"
+  is_var_set "TEMP_DIR" || die "Temporary directory is not set"
 
+  local copy_parallel="${IS_PARALLEL,,}"
   declare -a included_files
   find_with_inverse_patterns "$src" "$EXCLUDE_FILES" included_files
+
+  if [[ "${copy_parallel}" == true ]]; then
+    if ! check_command "parallel"; then
+      log_info "Parallel not installed. Fallback to single thread"
+      copy_parallel="false"
+      break
+    fi
+    export TEMP_DIR
+    printf "%s\0" "${included_files[@]}" | xargs -0 -P $(( $(nproc) * 4 )) -n 100 \
+    ionice -c 2 -n 7 cp --parents -t "$TEMP_DIR/"
+    return 0
+  fi
 
   declare -a excluded_files
   find_with_patterns "$src" "$EXCLUDE_FILES" excluded_files
@@ -345,48 +360,94 @@ tar_compress() {
   local compress_level=$(get_config_value ".compression.level" "$DEFAULT_COMPRESS_LEVEL")
   
   local err=1
+  local parallel_tar="${IS_PARALLEL,,}"
+  declare -a parallel_command
 
   if [[ "$compressor" == "none" ]]; then
     compress_level="none"
   fi
 
-  case "$compressor" in
-    "none") ;;
-    "gzip")
-      tar_options+="--gzip"
-      tar_env="GZIP="
-      case "$compress_level" in
-        "none")    tar_env+="-0" ;;
-        "minimum") tar_env+="-1" ;;
-        "medium")  tar_env+="-6" ;;
-        "maximum") tar_env+="-9" ;;
-        *)         tar_env+="-0" ;;
-      esac
-      ;;
-    "bzip")
-      tar_options+="--bzip2"
-      tar_env="BZIP2="
-      case "$compress_level" in
-        "none")    tar_env+="-1" ;;
-        "minimum") tar_env+="-1" ;;
-        "medium")  tar_env+="-6" ;;
-        "maximum") tar_env+="-9" ;;
-        *)         tar_env+="-1" ;;
-      esac
-      ;;
-  esac
+  if [[ "$parallel_tar" == true ]]; then
+    case "$compressor" in
+      "gzip") 
+        if ! check_command "pigz"; then
+          log_info "pigz command not available. Fallback to classic gzip"
+          parallel_tar="false"
+        fi
+        ;;
+      "bzip")
+        if ! check_command "pbzip2"; then
+          log_info "pigz command not available. Fallback to classic bzip"
+          parallel_tar="false"
+        fi
+        ;;
+      "none"|*)
+        log_info "Run tar without compressor. Fallback to single thread tar"
+          parallel_tar="false"
+        ;;
+    esac
+  fi
 
   log_info "Compressor: $compressor"
   log_info "Compression level: $compress_level"
 
-  set "$tar_env"
-  tar -cv $tar_options -f "$archive_name" "$files" 2>&1 | {
-    while read -r line; do
-      log_info "$line"
-    done
-  }
-  err=${PIPESTATUS[0]}
-  unset "$tar_env"
+  case "$compressor" in
+    "none") ;;
+    "gzip")
+      if [[ "$parallel_tar" == true ]]; then
+        parallel_command=("pigz" "-p" "$(nproc)")
+        case "$compress_level" in
+          "none")    parallel_command+=("-1") ;;
+          "minimum") parallel_command+=("-3") ;;
+          "medium")  parallel_command+=("-6") ;;
+          "maximum") parallel_command+=("-11") ;;
+          *)         parallel_command+=("-1") ;;
+        esac
+      else
+        tar_options+="--gzip"
+        tar_env="GZIP="
+        case "$compress_level" in
+          "none")    tar_env+="-0" ;;
+          "minimum") tar_env+="-1" ;;
+          "medium")  tar_env+="-6" ;;
+          "maximum") tar_env+="-9" ;;
+          *)         tar_env+="-0" ;;
+        esac
+      fi
+      ;;
+    "bzip")
+      if [[ "$parallel_tar" == true ]]; then
+        parallel_command=$("pbzip2" "-c")
+      else
+        tar_options+="--bzip2"
+        tar_env="BZIP2="
+        case "$compress_level" in
+          "none")    tar_env+="-1" ;;
+          "minimum") tar_env+="-1" ;;
+          "medium")  tar_env+="-6" ;;
+          "maximum") tar_env+="-9" ;;
+          *)         tar_env+="-1" ;;
+        esac
+      fi
+      ;;
+  esac
+
+  if [[ "$parallel_tar" == true ]]; then
+    tar -cf - "$files" | "${parallel_command[@]}" > "$archive_name"
+    err=${PIPESTATUS[0]}
+    if [[ ! $err -eq 0 ]]; then log_error "Failed to create tar archive"; break; fi
+    err=${PIPESTATUS[1]}
+    if [[ ! $err -eq 0 ]]; then log_error "Failed to compress tar archive"; break; fi
+  else
+    set "$tar_env"
+    tar -cv $tar_options -f "$archive_name" "$files" 2>&1 | {
+      while read -r line; do
+        log_info "$line"
+      done
+    }
+    err=${PIPESTATUS[0]}
+    unset "$tar_env"
+  fi
 
   [[ $err -eq 0 ]] && log_info "Success!" || log_error "Failed!"
   return $err
@@ -668,13 +729,16 @@ cmd_create() {
   CURRENT_BACKUP_NAME="${BACKUP_NAME}_${CREATION_TIME}"
   TEMP_DIR="${BACKUP_ROOT_DIR}/${CURRENT_BACKUP_NAME}"
 
+  IS_PARALLEL="$(get_config_value ".general.parallel" "false")"
+
   readonly BACKUP_ROOT_DIR TIMESTAMP_FILE BACKUP_HISTORY_FILE
-  readonly CURRENT_BACKUP_NAME TEMP_DIR LOG_FILE
+  readonly CURRENT_BACKUP_NAME TEMP_DIR LOG_FILE IS_PARALLEL
 
   > "$LOG_FILE"
 
   log_info "Create new backup"
   log_info "Start execution at ${CREATION_TIME}"
+  log_info "Use multithread: ${IS_PARALLEL}"
 
   check_timestamp
   local err=$?

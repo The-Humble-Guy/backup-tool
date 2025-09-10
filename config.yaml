@@ -4,6 +4,8 @@ general:
   backup_storage: "~/.backups"
   # At the moment, it adds the md5 sum to the file name.
   add_hashsum: true
+  # Parallelization of archive packaging and compression
+  parallel: true
 
 # The name of the folder with backups inside backup storage
 name: "documents"
