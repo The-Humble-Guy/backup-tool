@@ -42,6 +42,21 @@ get_config_value() {
   fi
 }
 
+# $1 - key
+# $2 - array to save
+get_config_array() {
+  local query="$1"
+  local -n arr_ref="$2"
+
+  arr_ref=()
+
+  while IFS= read -r line; do
+    if [[ -n "$line" ]]; then
+      arr_ref+=("$(printf "%s\0" "$line")")
+    fi
+  done < <(yq -r "$query" "$CONFIG_FILE" 2> /dev/null)
+}
+
 # $1 - path
 expand_path() {
   local path="$1"
@@ -178,7 +193,8 @@ prepare_files_lists() {
 
   log_info "Prepare lists of included and excluded files for backup"
   log_info "Direct include filepaths:"
-  direct_filepaths=$(get_config_value ".files.include[]" "")
+  declare -a direct_filepaths
+  get_config_array ".files.include[]" direct_filepaths
   for path in "${direct_filepaths[@]}"; do
     log_info "\t$path"
     expand_path "$path" >> "$INCLUDE_FILES"
@@ -186,7 +202,8 @@ prepare_files_lists() {
   log_info "Done"
 
   log_info "Filepaths from input files:"
-  include_from_files=$(get_config_value ".files.include_from[]" "")
+  declare -a include_from_files
+  get_config_array ".files.include_from[]" include_from_files
   for file in "${include_from_files[@]}"; do
     file=$(expand_path "$file")
     log_info "\tFile: $file"
@@ -198,7 +215,9 @@ prepare_files_lists() {
   log_info "Done"
 
   log_info "Direct exclude filepaths:"
-  direct_exclude_filepaths=$(get_config_value ".files.exclude[]" "")
+
+  declare -a direct_exclude_filepaths
+  get_config_array ".files.exclude[]" direct_exclude_filepaths
   for path in "${direct_exclude_filepaths[@]}"; do
     log_info "\t$path"
     full_path="$(expand_path "$path")"
@@ -224,11 +243,10 @@ find_with_patterns() {
   local search_dir="$1"
   local exclude_file="$2"
   local -n arr_ref="$3"
-  local inverse="${4:false}"
+  local inverse="${4:-false}"
 
   local find_args=("$search_dir" "-type" "f")
   local patterns=()
-  local first_pattern=true
   
   while IFS= read -r pattern; do
     if [[ -z "$pattern" || $pattern == \#* ]]; then
@@ -238,35 +256,36 @@ find_with_patterns() {
   done < "$exclude_file"
 
   if [[ ${#patterns[@]} -gt 0 ]]; then
-    find_args+=("(")
+    local condition_args=()
+    local first_pattern=true
+
     for pattern in "${patterns[@]}"; do
       if [[ $first_pattern == false ]]; then
-        find_args+=("-o")
+        condition_args+=("-o")
       else
-          first_pattern=false
+        first_pattern=false
       fi
-      
+
       if [[ $pattern == /* ]]; then
-        # Absolute path with masks
-        [[ $inverse == true ]] && find_args+=("-not")
-        find_args+=("-path" "$pattern")
+        condition_args+=("-path" "$pattern")
       else
-        # Simple mask
-        [[ $inverse == true ]] && find_args+=("-not")
-        find_args+=("-name" "$pattern")
+        condition_args+=("-name" "$pattern")
       fi
     done
-    find_args+=(")")
+
+    if [[ $inverse == true ]]; then
+      find_args+=("!" "(" "${condition_args[@]}" ")")
+    else
+      find_args+=("(" "${condition_args[@]}" ")")
+    fi
   fi
-  
+
   find_args+=("-print0")
 
   arr_ref=()
-  if [[ $inverse == true ]]; then
-    while IFS= read -r -d '' file; do
-        arr_ref+=("$file")
-    done < <(find "${find_args[@]}" 2>/dev/null)
-  fi
+  while IFS= read -r -d '' file; do
+    arr_ref+=("$file")
+  done < <(find "${find_args[@]}" 2>/dev/null)
 }
 
 # $1 - path to temp directory
