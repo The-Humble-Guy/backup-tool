@@ -158,7 +158,7 @@ copy_command() {
     fi
     export TEMP_DIR
     printf "%s\0" "${included_files[@]}" | xargs -0 -P $(( $(nproc) * 4 )) -n 100 \
-    ionice -c 2 -n 7 cp --parents -t "$TEMP_DIR/"
+    ionice -c 2 -n 7 cp --parents --no-dereference -t "$TEMP_DIR/"
     return 0
   fi
 
@@ -244,8 +244,9 @@ find_with_patterns() {
   local exclude_file="$2"
   local -n arr_ref="$3"
   local inverse="${4:-false}"
+  local file_type="${5:-f}"
 
-  local find_args=("$search_dir" "-type" "f")
+  local find_args=("$search_dir" "-type" "$file_type")
   local patterns=()
   
   while IFS= read -r pattern; do
@@ -278,6 +279,10 @@ find_with_patterns() {
     else
       find_args+=("(" "${condition_args[@]}" ")")
     fi
+
+    if [[ $file_type == "l" ]]; then
+      find_args+=("-exec" "test" "-e" "{}" ";")
+    fi
   fi
 
   find_args+=("-print0")
@@ -303,8 +308,16 @@ copy_files_to_temp() {
     mkdir -p "$tmpdir/$dirpath"
     copy_command "$abspath" "$tmpdir/$dirpath"
 
-    for symlink in $(find "$abspath" -type l -exec test -e {} \; -print); do
+    declare -a symlinks
+    find_with_patterns "$abspath" "$EXCLUDE_FILES" symlinks true "l"
+
+    for symlink in "${symlinks[@]}"; do
       log_info "Directory $abspath contains symlink $symlink"
+
+      symlink_dir="$(dirname "$symlink")"
+      mkdir -p "$tmpdir$symlink_dir"
+      cp -P "$symlink" "$tmpdir$symlink_dir"
+
       symlink_originate_path="$(realpath -m "$symlink")"
       symlink_originate_dir="$(dirname "$symlink_originate_path" | cut -c2-)"
       mkdir -p "$tmpdir/$symlink_originate_dir"
