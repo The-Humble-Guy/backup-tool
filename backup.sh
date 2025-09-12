@@ -456,7 +456,7 @@ tar_compress() {
       ;;
     "bzip")
       if [[ "$parallel_tar" == true ]]; then
-        parallel_command=$("pbzip2" "-c")
+        parallel_command=("pbzip2" "-c")
       else
         tar_options+="--bzip2"
         tar_env="BZIP2="
