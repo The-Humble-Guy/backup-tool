@@ -920,26 +920,79 @@ red_check() {
 }
 
 cmd_checkhealth() {
-  declare -a tools
-  tools=("bzip2" "cat" "cp" "crontab" "du" "find" "grep" "gzip" "head" "mv" "parallel" "pbzip2" "pigz" "tail" "tar" "yq" "zip")
+  declare -a tools_common=("cat" "cp" "crontab" "du" "find" "grep" "head" "mv" "tail" "yq")
+  declare -a tools_archive=("bzip2" "gzip" "pbzip2" "pigz" "tar" "zip")
+  declare -a tools_parallel=("parallel" "xargs")
+
   local max_length=0
   local bold=$(tput bold)
+  local reset=$(tput sgr0)
 
-  for element in "${tools[@]}"; do
+  for element in "${tools_common[@]}" "${tools_archive[@]}" "${tools_parallel[@]}"; do
     length=${#element}
-    if ((length > max_length)); then
+    if (( length > max_length )); then
       max_length=$length
     fi
   done
 
-  printf "Checking the availability of utilities:\n"
+  printf "Checking the availability of utilities:"
 
-  for tool in "${tools[@]}"; do
-    printf "%-$((max_length + 10))s" "${bold}${tool}"
-    check_command "$tool" && green_check || red_check
+  for tooltip in "tools_common" "tools_archive" "tools_parallel"; do
+    local greeting
+    case "$tooltip" in
+      "tools_common") greeting="Common utilities" ;;
+      "tools_archive") greeting="Archive utilities" ;;
+      "tools_parallel") greeting="Parallel utilities"
+    esac
+    declare -n arr="$tooltip"
+    printf "\n${bold}%s:${reset}\n" "$greeting"
+    for tool in "${arr[@]}"; do
+      printf "  %-$((max_length + 20))s" "${bold}${tool}${reset}"
+      check_command "$tool" && green_check || red_check
+    done
+    unset arr
   done
 
   return 0
+}
+
+cmd_help() {
+    cat << EOF
+Usage: backup [COMMAND]
+
+A tool for automatically creating backups. All backups are described by yaml configuration.
+
+Commands:
+  init                 Initialization of backup monitor (used cron)
+  deinit               Remove backup monitor job from cron
+  add-scenario         Add config in yaml format for creating backup
+  delete-scenario      Remove scenario from backup monitor (does not delete config on disk)
+  ls|list|--list       List all backup scenarios from backup monitor
+  create               Immediately try to create backup (with time check)
+  checkhealth          Check availability of all utilities
+  help                 Show this help message
+  version              Show version information
+
+Examples:
+  Initialize backup tool
+      backup init
+
+  Add backup scenario
+      backup add-scenario /path/to/scenario.yaml
+
+  Delete backup scenario:
+    with concrete file
+      backup delete-scenario /path/to/scenario.yaml
+
+    or in interactive mode (you will be prompted):
+      backup delete-scenario
+
+  List all your backups
+      backup list
+
+Example of config file see in github repo:
+   https://github.com/The-Humble-Guy/backup-tool/blob/master/config.yaml
+EOF
 }
 
 cmd_list() {
@@ -970,6 +1023,7 @@ case "$COMMAND" in
   create)          shift; cmd_create "$@" ;;
   checkhealth)     shift; cmd_checkhealth "$@" ;;
   version)         shift; cmd_version "$@" ;;
+  help|*)          shift; cmd_help "$@" ;;
 esac
 
 exit 0
