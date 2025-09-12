@@ -22,6 +22,7 @@ IS_PARALLEL=false
 readonly INCLUDE_FILES=$(mktemp)
 readonly EXCLUDE_FILES=$(mktemp)
 LOG_FILE=
+LOG_VERBOSE=false
 
 DEFAULT_COMPRESS_METHOD="tar"
 DEFAULT_COMPRESS_LEVEL="none"
@@ -327,12 +328,14 @@ copy_files_to_temp() {
     done
   done < "$INCLUDE_FILES"
 
-  log_info "Full list of backup files:"
-  ls -lah -R "$tmpdir" 2>& 1 | {
-    while read -r line; do
-      log_info "$line"
-    done
-  }
+  if [[ "$LOG_VERBOSE" == "true" ]]; then
+    log_info "Full list of backup files:"
+    ls -lah -R "$tmpdir" 2>& 1 | {
+      while read -r line; do
+        log_info "$line"
+      done
+    }
+  fi
   log_info "Success!"
 
   return 0
@@ -363,9 +366,13 @@ zip_compress() {
   log_info "Compression level: $compress_level"
 
   zip -r "$zip_options" "$archive_name" "$@" 2>&1 | {
-    while read -r line; do
-      log_info "$line"
-    done
+    if [[ "$LOG_VERBOSE" == "true" ]]; then
+      while read -r line; do
+        log_info "$line"
+      done
+    else
+      cat > /dev/null
+    fi
   }
   err=${PIPESTATUS[0]}
 
@@ -473,9 +480,13 @@ tar_compress() {
   else
     set "$tar_env"
     tar -cv $tar_options -f "$archive_name" "$files" 2>&1 | {
-      while read -r line; do
-        log_info "$line"
-      done
+      if [[ "$LOG_VERBOSE" == "true" ]]; then
+        while read -r line; do
+          log_info "$line"
+        done
+      else
+        cat > /dev/null
+      fi
     }
     err=${PIPESTATUS[0]}
     unset "$tar_env"
@@ -762,6 +773,7 @@ cmd_create() {
   TEMP_DIR="${BACKUP_ROOT_DIR}/${CURRENT_BACKUP_NAME}"
 
   IS_PARALLEL="$(get_config_value ".general.parallel" "false")"
+  LOG_VERBOSE="$(get_config_value ".general.verbose" "false")"
 
   readonly BACKUP_ROOT_DIR TIMESTAMP_FILE BACKUP_HISTORY_FILE
   readonly CURRENT_BACKUP_NAME TEMP_DIR LOG_FILE IS_PARALLEL

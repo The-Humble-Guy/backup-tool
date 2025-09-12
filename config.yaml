@@ -6,6 +6,7 @@ general:
   add_hashsum: true
   # Parallelization of archive packaging and compression
   parallel: true
+  verbose: true
 
 # The name of the folder with backups inside backup storage
 name: "documents"
