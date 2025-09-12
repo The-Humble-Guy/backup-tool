@@ -121,7 +121,7 @@ die() {
 }
 
 log() {
-  [[ -f "$LOG_FILE" ]] && printf "$1\n" >> "$LOG_FILE" || printf "$1\n"
+  [[ -f "$LOG_FILE" ]] && printf "$1\n" >> "$LOG_FILE"
 }
 
 log_info() {
