@@ -958,9 +958,9 @@ cmd_checkhealth() {
 
 cmd_help() {
     cat << EOF
-Usage: backup [COMMAND]
+Usage: backup [COMMAND] CONFIG_FILE
 
-A tool for automatically creating backups. All backups are described by yaml configuration.
+A tool for automatically creating backups. All backups are described by CONFIG_FILE yaml configuration.
 
 Commands:
   init                 Initialization of backup monitor (used cron)
