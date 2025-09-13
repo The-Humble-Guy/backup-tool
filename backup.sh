@@ -420,6 +420,8 @@ tar_compress() {
           parallel_tar="false"
         fi
         ;;
+      "zstd")
+        ;;
       "none"|*)
         log_info "Run tar without compressor. Fallback to single thread tar"
           parallel_tar="false"
@@ -469,14 +471,38 @@ tar_compress() {
         esac
       fi
       ;;
+    "zstd")
+      if [[ "$parallel_tar" == true ]]; then
+        parallel_command=("zstd" "-T0")
+        case "$compress_level" in
+          "none")     parallel_command+=("-1") ;;
+          "minimum")  parallel_command+=("-4") ;;
+          "medium")   parallel_command+=("-12") ;;
+          "maximum")  parallel_command+=("-22") ;;
+          *)          parallel_command+=("-1") ;;
+        esac
+        parallel_command+=("--stdout")
+        cat "${parallel_command[@]}"
+      else
+        tar_env="ZSTD_CLEVEL"
+        tar_options="--zstd"
+        case "$compress_level" in
+          "none")    tar_env+="1" ;;
+          "minimum") tar_env+="4" ;;
+          "medium")  tar_env+="12" ;;
+          "maximum") tar_env+="22" ;;
+          *)         tar_env+="1" ;;
+        esac
+      fi
+      ;;
   esac
 
   if [[ "$parallel_tar" == true ]]; then
     tar -cf - "$files" | "${parallel_command[@]}" > "$archive_name"
     err=${PIPESTATUS[0]}
-    if [[ ! $err -eq 0 ]]; then log_error "Failed to create tar archive"; break; fi
+    if [[ ! $err -eq 0 ]]; then log_error "Failed to create tar archive. Error code: $err"; break; fi
     err=${PIPESTATUS[1]}
-    if [[ ! $err -eq 0 ]]; then log_error "Failed to compress tar archive"; break; fi
+    if [[ ! $err -eq 0 ]]; then log_error "Failed to compress tar archive. Error code: $err"; break; fi
   else
     set "$tar_env"
     tar -cv $tar_options -f "$archive_name" "$files" 2>&1 | {
@@ -489,6 +515,7 @@ tar_compress() {
       fi
     }
     err=${PIPESTATUS[0]}
+    if [[ ! $err -eq 0 ]]; then log_error "Failed to create tar archive. Error code: $err"; fi
     unset "$tar_env"
   fi
 
@@ -554,6 +581,12 @@ create_archive() {
       extenstion="tar.bz"
       archive_name="${archive_name}.${extenstion}"
       tar_compress "$archive_name" bzip "$@"
+      err=$?
+      ;;
+    "tar.zst")
+      extenstion="tar.zst"
+      archive_name="${archive_name}.${extenstion}"
+      tar_compress "$archive_name" zstd "$@"
       err=$?
       ;;
     *)
